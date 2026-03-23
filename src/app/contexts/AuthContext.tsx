@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import type { User } from "./DataContext";
 
-const API = "http://localhost:3001/api";
+const API = import.meta.env.VITE_API_URL ?? "http://localhost:3001/api";
 
 interface AuthContextValue {
   user: User | null;
