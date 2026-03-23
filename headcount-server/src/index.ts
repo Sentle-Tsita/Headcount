@@ -19,7 +19,7 @@ app.use(cors({
   origin: [
     "http://localhost:5173",
     "http://localhost:3000",
-    "https://headcount-eta.vercel.app"
+    "https://headcount-eta.vercel.app", // ✅ Production frontend
   ],
   credentials: true,
 }));
@@ -45,7 +45,6 @@ app.get("/api/programmes/public", async (_req, res) => {
       include: { departments: { include: { department: true } } },
       orderBy: { name: "asc" },
     });
-    // ✅ Returns departmentIds array for multi-department support
     res.json(data.map(p => ({
       id:            p.id,
       name:          p.name,
