@@ -4,7 +4,7 @@ import { Eye, EyeOff, BookOpen, UserPlus, Check, AlertCircle, Loader2 } from "lu
 import { useData } from "../contexts/DataContext";
 import { useAuth } from "../contexts/AuthContext";
 
-const API = "http://localhost:3001/api";
+const API = import.meta.env.VITE_API_URL ?? "http://localhost:3001/api";
 
 export default function RegistrationPage() {
   const navigate = useNavigate();
