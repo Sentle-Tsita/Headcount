@@ -8,9 +8,9 @@
   },
   "scripts": {
     "dev": "nodemon src/index.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/index.js",
-    "postinstall": "prisma generate --schema=prisma/schema.prisma"
+    "postinstall": "prisma generate --schema=prisma/schema.prisma",
     "db:push": "prisma db push",
     "db:seed": "ts-node prisma/seed.ts",
     "db:studio": "prisma studio"
