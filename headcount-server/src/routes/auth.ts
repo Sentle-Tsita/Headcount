@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
+export default router;
 
 const prisma = new PrismaClient();
 
