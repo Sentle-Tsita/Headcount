@@ -17,13 +17,16 @@ const PORT = process.env.PORT ?? 3001;
 
 app.use(cors({
   origin: (origin, callback) => {
-    const allowed = [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://headcount-eta.vercel.app",
-    ];
-    if (!origin || allowed.includes(origin)) callback(null, true);
-    else callback(new Error("Not allowed by CORS"));
+    if (
+      !origin ||
+      origin === "http://localhost:5173" ||
+      origin === "http://localhost:3000" ||
+      origin.endsWith(".vercel.app")
+    ) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
   },
   credentials: true,
 }));
