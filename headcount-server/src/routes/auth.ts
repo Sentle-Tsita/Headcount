@@ -1,163 +1,130 @@
-import { PrismaClient } from "@prisma/client";
+// src/routes/auth.ts
+import { Router, Request, Response } from "express";
 import bcrypt from "bcrypt";
-export default router;
+import jwt from "jsonwebtoken";
+import prisma from "../lib/prisma";
 
-const prisma = new PrismaClient();
+const router = Router();
 
-async function main() {
-  console.log("🌱 Seeding database...");
-
-  // ── Departments ──────────────────────────────────────────────
-  const [d1, d2, d3, d4] = await Promise.all([
-    prisma.department.upsert({ where: { name: "Computer Science" }, update: {}, create: { id: "d1", name: "Computer Science" } }),
-    prisma.department.upsert({ where: { name: "Mathematics" },      update: {}, create: { id: "d2", name: "Mathematics" } }),
-    prisma.department.upsert({ where: { name: "Physics" },          update: {}, create: { id: "d3", name: "Physics" } }),
-    prisma.department.upsert({ where: { name: "Administration" },   update: {}, create: { id: "d4", name: "Administration" } }),
-  ]);
-  console.log("✅ Departments seeded");
-
-  // ── Programmes ───────────────────────────────────────────────
-  const [p1, p2, p3, p4, p5, p6] = await Promise.all([
-    prisma.programme.upsert({ where: { name: "BSc Computer Science" },       update: {}, create: { id: "p1", name: "BSc Computer Science" } }),
-    prisma.programme.upsert({ where: { name: "BSc Information Technology" }, update: {}, create: { id: "p2", name: "BSc Information Technology" } }),
-    prisma.programme.upsert({ where: { name: "BSc Mathematics" },            update: {}, create: { id: "p3", name: "BSc Mathematics" } }),
-    prisma.programme.upsert({ where: { name: "BSc Applied Mathematics" },    update: {}, create: { id: "p4", name: "BSc Applied Mathematics" } }),
-    prisma.programme.upsert({ where: { name: "BSc Physics" },                update: {}, create: { id: "p5", name: "BSc Physics" } }),
-    prisma.programme.upsert({ where: { name: "BSc Mathematical Physics" },   update: {}, create: { id: "p6", name: "BSc Mathematical Physics" } }),
-  ]);
-  console.log("✅ Programmes seeded");
-
-  // ── Programme ↔ Department links ─────────────────────────────
-  const links = [
-    { programmeId: p1.id, departmentId: d1.id },
-    { programmeId: p2.id, departmentId: d1.id },
-    { programmeId: p3.id, departmentId: d2.id },
-    { programmeId: p4.id, departmentId: d2.id },
-    { programmeId: p5.id, departmentId: d3.id },
-    { programmeId: p6.id, departmentId: d2.id },
-    { programmeId: p6.id, departmentId: d3.id },
-  ];
-
-  for (const link of links) {
-    await prisma.programmeDepartment.upsert({
-      where: { programmeId_departmentId: { programmeId: link.programmeId, departmentId: link.departmentId } },
-      update: {},
-      create: link,
-    });
+// ── POST /api/auth/login ─────────────────────────────────────
+router.post("/login", async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required" });
+    return;
   }
-  console.log("✅ Programme-Department links seeded");
 
-  // ── Courses ──────────────────────────────────────────────────
-  await Promise.all([
-    prisma.course.upsert({ where: { code: "CS1001" }, update: {}, create: { id: "c1", name: "Introduction to Computer Science", code: "CS1001", departmentId: d1.id, year: 1, credits: 3, maxEnrollment: 30 } }),
-    prisma.course.upsert({ where: { code: "MA1001" }, update: {}, create: { id: "c2", name: "Mathematics for Engineers",        code: "MA1001", departmentId: d2.id, year: 1, credits: 4, maxEnrollment: 40 } }),
-    prisma.course.upsert({ where: { code: "CS2001" }, update: {}, create: { id: "c3", name: "Data Structures & Algorithms",     code: "CS2001", departmentId: d1.id, year: 2, credits: 3, maxEnrollment: 25 } }),
-    prisma.course.upsert({ where: { code: "CS3001" }, update: {}, create: { id: "c4", name: "Database Management Systems",      code: "CS3001", departmentId: d1.id, year: 3, credits: 3, maxEnrollment: 30 } }),
-    prisma.course.upsert({ where: { code: "PH1001" }, update: {}, create: { id: "c5", name: "Physics I",                        code: "PH1001", departmentId: d3.id, year: 1, credits: 4, maxEnrollment: 35 } }),
-    prisma.course.upsert({ where: { code: "MA1002" }, update: {}, create: { id: "c6", name: "Calculus I",                       code: "MA1002", departmentId: d2.id, year: 1, credits: 4, maxEnrollment: 40 } }),
-    prisma.course.upsert({ where: { code: "CS2002" }, update: {}, create: { id: "c7", name: "Operating Systems",                code: "CS2002", departmentId: d1.id, year: 2, credits: 3, maxEnrollment: 30 } }),
-    prisma.course.upsert({ where: { code: "CS3002" }, update: {}, create: { id: "c8", name: "Software Engineering",             code: "CS3002", departmentId: d1.id, year: 3, credits: 3, maxEnrollment: 30 } }),
-  ]);
-  console.log("✅ Courses seeded");
-
-  // ── Users ─────────────────────────────────────────────────────
-  // Hashes are computed fresh every seed run and always written to the DB,
-  // so a SIGTERM mid-seed or a stale hash can never block login.
-  const adminHash    = await bcrypt.hash("admin123",    10);
-  const lecturerHash = await bcrypt.hash("lecturer123", 10);
-  const studentHash  = await bcrypt.hash("student123",  10);
-
-  await prisma.user.upsert({
-    where:  { email: "admin@university.edu" },
-    update: { password: adminHash },
-    create: { id: "admin1", name: "Admin User", email: "admin@university.edu", password: adminHash, role: "admin", staffId: "ADM001", departmentId: d4.id, phone: "+266 5000 0001" },
-  });
-
-  const l1 = await prisma.user.upsert({
-    where:  { email: "s.johnson@university.edu" },
-    update: { password: lecturerHash },
-    create: { id: "l1", name: "Dr. Sarah Johnson", email: "s.johnson@university.edu", password: lecturerHash, role: "lecturer", staffId: "e100000001", departmentId: d1.id, phone: "+266 5000 0002" },
-  });
-
-  const l2 = await prisma.user.upsert({
-    where:  { email: "m.brown@university.edu" },
-    update: { password: lecturerHash },
-    create: { id: "l2", name: "Prof. Michael Brown", email: "m.brown@university.edu", password: lecturerHash, role: "lecturer", staffId: "e100000002", departmentId: d2.id, phone: "+266 5000 0003" },
-  });
-
-  const l3 = await prisma.user.upsert({
-    where:  { email: "e.davis@university.edu" },
-    update: { password: lecturerHash },
-    create: { id: "l3", name: "Dr. Emily Davis", email: "e.davis@university.edu", password: lecturerHash, role: "lecturer", staffId: "e100000003", departmentId: d1.id, phone: "+266 5000 0004" },
-  });
-
-  const s1 = await prisma.user.upsert({
-    where:  { email: "alice@student.edu" },
-    update: { password: studentHash },
-    create: { id: "s1", name: "Alice Mokoena", email: "alice@student.edu", password: studentHash, role: "student", studentId: "s202312345", programmeId: p1.id, departmentId: d1.id, yearOfStudy: 1, phone: "+266 5800 0001" },
-  });
-
-  const s2 = await prisma.user.upsert({
-    where:  { email: "bob@student.edu" },
-    update: { password: studentHash },
-    create: { id: "s2", name: "Bob Ntšekhe", email: "bob@student.edu", password: studentHash, role: "student", studentId: "s202367890", programmeId: p3.id, departmentId: d2.id, yearOfStudy: 1, phone: "+266 5800 0002" },
-  });
-  console.log("✅ Users seeded");
-
-  // ── Lecturer assignments ──────────────────────────────────────
-  const lecturerAssignments = [
-    { lecturerId: l1.id, courseId: "c1" },
-    { lecturerId: l1.id, courseId: "c3" },
-    { lecturerId: l2.id, courseId: "c2" },
-    { lecturerId: l2.id, courseId: "c5" },
-    { lecturerId: l2.id, courseId: "c6" },
-    { lecturerId: l3.id, courseId: "c4" },
-    { lecturerId: l3.id, courseId: "c7" },
-  ];
-  for (const a of lecturerAssignments) {
-    await prisma.lecturerCourse.upsert({
-      where:  { lecturerId_courseId: { lecturerId: a.lecturerId, courseId: a.courseId } },
-      update: {},
-      create: a,
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      include: {
+        department: true,
+        programme: true,
+        enrolledCourses: true,
+        assignedCourses: true,
+      },
     });
-  }
-  console.log("✅ Lecturer assignments seeded");
 
-  // ── Student enrollments ───────────────────────────────────────
-  const studentEnrollments = [
-    { studentId: s1.id, courseId: "c1" },
-    { studentId: s2.id, courseId: "c2" },
-    { studentId: s2.id, courseId: "c6" },
-  ];
-  for (const e of studentEnrollments) {
-    await prisma.studentCourse.upsert({
-      where:  { studentId_courseId: { studentId: e.studentId, courseId: e.courseId } },
-      update: {},
-      create: e,
+    if (!user) { res.status(401).json({ error: "Invalid email or password" }); return; }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) { res.status(401).json({ error: "Invalid email or password" }); return; }
+
+    const token = jwt.sign(
+      { userId: user.id, role: user.role },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "7d" }
+    );
+
+    res.json({ token, user: formatUser(user) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ── POST /api/auth/register ──────────────────────────────────
+router.post("/register", async (req: Request, res: Response) => {
+  const {
+    name, email, password, role, phone,
+    studentId, staffId, departmentId, programmeId,
+    yearOfStudy, courseIds,
+  } = req.body;
+
+  if (!name || !email || !password || !role) {
+    res.status(400).json({ error: "Name, email, password and role are required" });
+    return;
+  }
+
+  try {
+    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    if (existing) { res.status(409).json({ error: "Email already registered" }); return; }
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email: email.toLowerCase(),
+        password: hashed,
+        role,
+        phone,
+        studentId,
+        staffId,
+        departmentId,
+        programmeId,
+        yearOfStudy: yearOfStudy ? Number(yearOfStudy) : undefined,
+        // ✅ Atomically link courses on creation
+        ...(role === "student" && courseIds?.length > 0 && {
+          enrolledCourses: {
+            create: (courseIds as string[]).map((courseId: string) => ({ courseId })),
+          },
+        }),
+        ...(role === "lecturer" && courseIds?.length > 0 && {
+          assignedCourses: {
+            create: (courseIds as string[]).map((courseId: string) => ({ courseId })),
+          },
+        }),
+      },
+      include: {
+        department: true,
+        programme: true,
+        enrolledCourses: true,
+        assignedCourses: true,
+      },
     });
-  }
-  console.log("✅ Student enrollments seeded");
 
-  // ── Attendance ────────────────────────────────────────────────
-  const attendanceRecords = [
-    { id: "a1", courseId: "c1", studentId: s1.id, date: new Date("2026-03-10"), status: "present" as const, markedById: l1.id },
-    { id: "a2", courseId: "c1", studentId: s1.id, date: new Date("2026-03-12"), status: "present" as const, markedById: l1.id },
-    { id: "a3", courseId: "c1", studentId: s1.id, date: new Date("2026-03-14"), status: "absent"  as const, markedById: l1.id },
-    { id: "a5", courseId: "c2", studentId: s2.id, date: new Date("2026-03-10"), status: "present" as const, markedById: l2.id },
-    { id: "a6", courseId: "c2", studentId: s2.id, date: new Date("2026-03-12"), status: "late"    as const, markedById: l2.id },
-  ];
-  for (const r of attendanceRecords) {
-    await prisma.attendanceRecord.upsert({
-      where:  { id: r.id },
-      update: {},
-      create: r,
-    });
-  }
-  console.log("✅ Attendance seeded");
+    const token = jwt.sign(
+      { userId: user.id, role: user.role },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "7d" }
+    );
 
-  console.log("\n🎉 Database seeded successfully!");
+    res.status(201).json({ token, user: formatUser(user) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ── Helper: shape DB user to match frontend User interface ───
+function formatUser(user: any) {
+  return {
+    id:              user.id,
+    name:            user.name,
+    email:           user.email,
+    role:            user.role,
+    phone:           user.phone,
+    studentId:       user.studentId,
+    staffId:         user.staffId,
+    departmentId:    user.departmentId,
+    department:      user.department?.name,
+    programmeId:     user.programmeId,
+    programme:       user.programme?.name,
+    yearOfStudy:     user.yearOfStudy,
+    enrolledCourses: user.enrolledCourses?.map((e: any) => e.courseId) ?? [],
+    assignedCourses: user.assignedCourses?.map((a: any) => a.courseId) ?? [],
+  };
 }
 
-main()
-  .catch(e => { console.error("❌ Seed failed:", e); process.exit(1); })
-  .finally(async () => { await prisma.$disconnect(); });
+export default router;
